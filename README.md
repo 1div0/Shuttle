@@ -1,4 +1,4 @@
 Shuttle
 =======
 
-Controlling Ardour with OpenSound Control from Contour Design ShuttlePro
+Controlling Ardour with Open Sound Control from Contour Design ShuttlePRO v2
