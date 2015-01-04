@@ -1,0 +1,5 @@
+Shuttle
+*.o
+*~
+.cproject
+.project
