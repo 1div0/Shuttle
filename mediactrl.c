@@ -29,7 +29,10 @@
 #include <string.h>
 #include <errno.h>
 
+#ifdef __linux__
 #include <linux/input.h>
+#endif
+
 #include "mediactrl.h"
 
 

@@ -40,7 +40,7 @@ The OSC webpage is http://cnmat.cnmat.berkeley.edu/OpenSoundControl
 #include <sys/stat.h>
 #include <netinet/in.h>
 
-#include <rpc/rpc.h>
+/* #include <rpc/rpc.h> */
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/times.h>

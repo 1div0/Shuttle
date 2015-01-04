@@ -7,11 +7,18 @@
 #include <signal.h>
 #include <errno.h>
 #include <signal.h>
+#include <sys/time.h>
+#include <unistd.h>
+#ifdef __linux__
 #include <linux/input.h>
+#endif
+
+/* http://archive.cnmat.berkeley.edu/OpenSoundControl/Kit/ */
+
+#include <OSC-client.h>
 
 #include "mediactrl.h"
 #include "htmsocket.h"
-#include "OSC-client.h"
 
 #define SIGNALS 32
 
@@ -252,7 +259,6 @@ main (int argc, char **argv)
   struct media_ctrl mc ;
   struct media_ctrl_event me ;
   OSCbuf buf[1] ;
-  bool valid = FALSE ;
   typedArg arg ;
 
   if (argc <= 1)
