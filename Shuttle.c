@@ -7,38 +7,17 @@
 #include <signal.h>
 #include <errno.h>
 #include <signal.h>
-#include <sys/time.h>
 #include <unistd.h>
+#include <lo/lo.h>
 #ifdef __linux__
 #include <linux/input.h>
 #endif
 
-/* http://archive.cnmat.berkeley.edu/OpenSoundControl/Kit/ */
-
-#include <OSC-client.h>
-
 #include "mediactrl.h"
-#include "htmsocket.h"
 
 #define SIGNALS 32
 
-typedef struct
-{
-  enum { INT, FLOAT, STRING } type ;
-  union
-  {
-    int i ;
-    float f ;
-    char *s ;
-  } datum ;
-} typedArg ;
-
-static int useTypeTags = 1 ;
 static int end ;
-
-#define MAX_ARGS 2000
-#define SC_BUFFER_SIZE 32000
-static char bufferForOSCbuf[SC_BUFFER_SIZE] ;
 
 struct signal_handler
 {
@@ -125,158 +104,44 @@ void fatal_error(char *s)
   exit (4) ;
 }
 
-int WriteMessage(OSCbuf *buf, char *messageName, int numArgs, typedArg *args) {
-    int j, returnVal;
-
-    returnVal = 0;
-
-#ifdef DEBUG
-    printf("WriteMessage: %s ", messageName);
-
-     for (j = 0; j < numArgs; j++) {
-        switch (args[j].type) {
-            case INT:
-            printf("%d ", args[j].datum.i);
-            break;
-
-            case FLOAT:
-            printf("%f ", args[j].datum.f);
-            break;
-
-            case STRING:
-            printf("%s ", args[j].datum.s);
-            break;
-
-            default:
-            fatal_error("Unrecognized arg type");
-            exit(5);
-        }
-    }
-    printf("\n");
-#endif
-
-    if (!useTypeTags) {
-        returnVal = OSC_writeAddress(buf, messageName);
-        if (returnVal) {
-            complain("Problem writing address: %s\n", OSC_errorMessage);
-        }
-    } else {
-        /* First figure out the type tags */
-        char typeTags[MAX_ARGS+2];
-        int i;
-
-        typeTags[0] = ',';
-
-        for (i = 0; i < numArgs; ++i) {
-            switch (args[i].type) {
-                case INT:
-                typeTags[i+1] = 'i';
-                break;
-
-                case FLOAT:
-                typeTags[i+1] = 'f';
-                break;
-
-                case STRING:
-                typeTags[i+1] = 's';
-                break;
-
-                default:
-                fatal_error("Unrecognized arg type");
-                exit(5);
-            }
-        }
-        typeTags[i+1] = '\0';
-            
-        returnVal = OSC_writeAddressAndTypes(buf, messageName, typeTags);
-        if (returnVal) {
-            complain("Problem writing address: %s\n", OSC_errorMessage);
-        }
-    }
-
-     for (j = 0; j < numArgs; j++) {
-        switch (args[j].type) {
-            case INT:
-            if ((returnVal = OSC_writeIntArg(buf, args[j].datum.i)) != 0) {
-                return returnVal;
-            }
-            break;
-
-            case FLOAT:
-            if ((returnVal = OSC_writeFloatArg(buf, args[j].datum.f)) != 0) {
-                return returnVal;
-            }
-            break;
-
-            case STRING:
-            if ((returnVal = OSC_writeStringArg(buf, args[j].datum.s)) != 0) {
-                return returnVal;
-            }
-            break;
-
-            default:
-            fatal_error("Unrecognized arg type");
-            exit(5);
-        }
-    }
-
-    return returnVal;
-}
-
-void SendData(void *htmsocket, int size, char *data) {
-    if (!SendHTMSocket(htmsocket, size, data)) {
-        perror("Couldn't send out socket: ");
-        CloseHTMSocket(htmsocket);
-        exit(3);
-    }
-}
-
-void SendBuffer(void *htmsocket, OSCbuf *buf) {
-#ifdef DEBUG
-    printf("Sending buffer...\n");
-#endif
-    if (OSC_isBufferEmpty(buf)) return;
-    if (!OSC_isBufferDone(buf)) {
-        fatal_error("SendBuffer() called but buffer not ready!");
-        exit(5);
-    }
-    SendData(htmsocket, OSC_packetSize(buf), OSC_getPacket(buf));
-}
-
 static void usage ()
 {
   fprintf (stderr, "Usage:\n") ;
-  fprintf (stderr, "%s host [port]\n", Name) ;
+  fprintf (stderr, "%s [host] [port]\n", Name) ;
 }
 
 int 
 main (int argc, char **argv)
 {
   int error = 0, i = 1 ;
-  int port = 3819 ;
-  char *host ;
-  void *htmsocket ;
+  char *host = "localhost" ;
+  char *port = "3819" ;
+  lo_address target ;
   struct media_ctrl mc ;
   struct media_ctrl_event me ;
-  OSCbuf buf[1] ;
-  typedArg arg ;
 
+  /*
   if (argc <= 1)
   {
     usage () ;
     return -1 ;
   }
+  */
 
-  host = argv[i] ;
-  if (argc > 2)
+  if (argc > 1)
   {
-    port = atoi (argv[i + 1]) ;
+    host = argv[i] ;
   }
 
-  htmsocket = OpenHTMSocket (host, port) ;
-  if (htmsocket == NULL)
+  if (argc > 2)
   {
-    perror ("Couldn't open socket: ") ;
+    port = argv[i + 1] ;
+  }
+
+  target = lo_address_new (host, port) ;
+  if (target == NULL)
+  {
+    fprintf (stderr, "Failed to open %s:%s\n", host, port) ;
     return 1 ;
   }
 
@@ -287,29 +152,31 @@ main (int argc, char **argv)
   {
     media_ctrl_read_event (&mc, &me) ;
 
-    OSC_initBuffer (buf, SC_BUFFER_SIZE, bufferForOSCbuf) ;
-
     switch (me.type)
     {
       case MEDIA_CTRL_EVENT_KEY :
       {
-        printf ("Key %04x %02x\n", me.code, me.value) ;
+        char *command = NULL ;
+    	printf ("Key %04x %02x\n", me.code, me.value) ;
 
         if (me.value == 1)
         {
           switch (me.code)
           {
-            case MEDIA_CTRL_F1 : WriteMessage (buf, "/ardour/rewind", 0, NULL) ; break ;
-            case MEDIA_CTRL_F2 : WriteMessage (buf, "/ardour/transport_play", 0, NULL) ; break ;
-            case MEDIA_CTRL_F3 : WriteMessage (buf, "/ardour/transport_stop", 0, NULL) ; break ;
-            case MEDIA_CTRL_F4 : WriteMessage (buf, "/ardour/ffwd", 0, NULL) ; break ;
-            case MEDIA_CTRL_B4 : WriteMessage (buf, "/ardour/goto_start", 0, NULL) ; break ;
-            case MEDIA_CTRL_B2 : WriteMessage (buf, "/ardour/prev_marker", 0, NULL) ; break ;
-            case MEDIA_CTRL_B1 : WriteMessage (buf, "/ardour/add_marker", 0, NULL) ; break ;
-            case MEDIA_CTRL_B3 : WriteMessage (buf, "/ardour/next_marker", 0, NULL) ; break ;
-            case MEDIA_CTRL_B5 : WriteMessage (buf, "/ardour/goto_end", 0, NULL) ; break ;
+            case MEDIA_CTRL_F1 : command = "/ardour/rewind" ; break ;
+            case MEDIA_CTRL_F2 : command = "/ardour/transport_play" ; break ;
+            case MEDIA_CTRL_F3 : command = "/ardour/transport_stop" ; break ;
+            case MEDIA_CTRL_F4 : command = "/ardour/ffwd" ; break ;
+            case MEDIA_CTRL_B4 : command = "/ardour/goto_start" ; break ;
+            case MEDIA_CTRL_B2 : command = "/ardour/prev_marker" ; break ;
+            case MEDIA_CTRL_B1 : command = "/ardour/add_marker" ; break ;
+            case MEDIA_CTRL_B3 : command = "/ardour/next_marker" ; break ;
+            case MEDIA_CTRL_B5 : command = "/ardour/goto_end" ; break ;
           }
-          SendBuffer (htmsocket, buf) ;
+          if (command != NULL)
+          {
+        	lo_send (target, command, "") ;
+          }
         }
         break ;
       }
@@ -317,34 +184,33 @@ main (int argc, char **argv)
       case MEDIA_CTRL_EVENT_SHUTTLE :
       {
         static float table[8] = { 0.0, 0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0 } ;
-        float speed ;
+        float f, speed ;
 
         printf ("Shuttle %d\n", me.value) ;
 
         speed = table[me.value > 0 ? +me.value : -me.value ] ;
+        f = me.value > 0 ? +speed : -speed ;
 
-        arg.type = FLOAT ;
-        arg.datum.f = me.value > 0 ? +speed : -speed ;
-        WriteMessage (buf, "/ardour/set_transport_speed", 1, &arg) ;
-        SendBuffer (htmsocket, buf) ;
+        lo_send (target, "/ardour/set_transport_speed", "f", f) ;
         break ;
       }
 
       case MEDIA_CTRL_EVENT_JOG :
       {
+        char *s ;
+
         printf ("Jog %d\n", me.value) ;
 
-        arg.type = STRING ;
-        arg.datum.s = me.value > 0 ? "Editor/playhead-forward-to-grid" : "Editor/playhead-backward-to-grid" ;
-        WriteMessage (buf, "/ardour/access_action", 1, &arg) ;
-        SendBuffer (htmsocket, buf) ;
+        s = me.value > 0 ? "Editor/playhead-forward-to-grid" : "Editor/playhead-backward-to-grid" ;
+        lo_send (target, "/ardour/access_action", "s", s) ;
         break ;
       }
     }
   }
+
   media_ctrl_close (&mc) ;
 
-  CloseHTMSocket (htmsocket) ;
+  lo_address_free (target) ;
 
   error = 0 ;
 

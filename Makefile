@@ -1,23 +1,23 @@
 TARGET = Shuttle
-CFILES = $(TARGET).c htmsocket.c mediactrl.c
-CFLAGS=-O3 -W -Wall
-LIBS = -lOSC
+SOURCES = $(TARGET).c mediactrl.c
+CFLAGS = -O3 -W -Wall
+PKG_CONFIG = pkg-config
+LIBS := `$(PKG_CONFIG) --libs liblo`
 
-INSTALL_DIR=/usr/local/bin
+INSTALL_DIR = /usr/local/bin
 
-OBJ=$(TARGET).o htmsocket.o mediactrl.o
+objects := $(patsubst %.c,%.o,$(wildcard $(SOURCES)))
 
 all: $(TARGET)
 
 install: all
-	install $(TARGET) ${INSTALL_DIR}
+	install $(TARGET) $(INSTALL_DIR)
 
-$(TARGET): ${OBJ}
-	$(CC) ${CFLAGS} ${OBJ} -o $@
+$(TARGET): $(objects)
+	$(CC) $(CFLAGS) $^ $(LIBS) -o $@
 
 clean:
-	$(RM) $(TARGET) $(OBJ)
+	$(RM) $(TARGET) $(objects)
 
-$(TARGET).o: $(TARGET).c
-htmsocket.o: htmsocket.c htmsocket.h
+$(TARGET).o: $(TARGET).c mediactrl.h
 mediactrl.o: mediactrl.c mediactrl.h
