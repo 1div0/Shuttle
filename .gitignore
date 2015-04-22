@@ -3,3 +3,5 @@ Shuttle
 *~
 .cproject
 .project
+.settings
+.gdbinit
