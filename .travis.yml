@@ -1,0 +1,28 @@
+language: c
+
+os:
+ - linux
+ - osx
+
+compiler:
+ - clang
+ - gcc
+
+before_script:
+
+script:
+ - make
+
+env:
+  global:
+   - secure: ""
+
+addons:
+  coverity_scan:
+    project:
+      name: 1div0/Shuttle
+      version: 1.0.0
+      description: Controlling Ardour with Open Sound Control from Contour Design ShuttlePRO & ShuttlePRO v2
+      notification_email: coverityscan@reflexion.tv
+      build_command: make
+      branch_pattern: coverity_scan
