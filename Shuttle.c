@@ -106,34 +106,48 @@ void fatal_error(char *s)
 
 static void usage ()
 {
-  fprintf (stderr, "Usage:\n") ;
+  fprintf (stderr, "Usage:\n\n") ;
   fprintf (stderr, "%s [host] [port]\n", Name) ;
 }
 
 int 
 main (int argc, char **argv)
 {
-  int error = 0, i = 1 ;
+  int error = 0, c = argc, i = 1, verbose = 0 ;
+  char *arg ;
   char *host = "localhost" ;
   char *port = "3819" ;
   lo_address target ;
   struct media_ctrl mc ;
   struct media_ctrl_event me ;
 
-  /*
-  if (argc <= 1)
-  {
-    usage () ;
-    return -1 ;
-  }
-  */
+  arg = argv[i] ;
 
-  if (argc > 1)
+  if (arg != NULL && arg[0] == '-')
+  {
+    switch (argv[i][1])
+    {
+      case 'h' :
+        usage () ;
+        return -1 ;
+
+      case 'v' :
+        verbose++ ;
+        break ;
+
+      default :
+        usage () ;
+    }
+    i++ ;
+    c-- ;
+  }
+
+  if (c > 1)
   {
     host = argv[i] ;
   }
 
-  if (argc > 2)
+  if (c > 2)
   {
     port = argv[i + 1] ;
   }

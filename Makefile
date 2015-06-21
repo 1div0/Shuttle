@@ -2,9 +2,15 @@ TARGET = Shuttle
 SOURCES = $(TARGET).c mediactrl.c
 CFLAGS = -O3 -W -Wall
 PKG_CONFIG = pkg-config
+
+CFLAGS += `$(PKG_CONFIG) --cflags liblo`
 LIBS := `$(PKG_CONFIG) --libs liblo`
 
 INSTALL_DIR = /usr/local/bin
+
+ifdef DEBUG
+CFLAGS += -g
+endif # DEBUG
 
 objects := $(patsubst %.c,%.o,$(wildcard $(SOURCES)))
 
