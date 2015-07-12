@@ -317,7 +317,7 @@ void media_ctrl_read_event(struct media_ctrl *ctrl, struct media_ctrl_event *me)
 		gettimeofday(&timev, NULL);
 		unsigned long now = (unsigned long)timev.tv_usec + (1000000*(unsigned long)timev.tv_sec);
 		if ( now < ctrl->last_jog_time + 40000 ) {
-			printf("*** Fast Jog %02d %05d ***\n", me->value, now - ctrl->last_jog_time);
+			printf("*** Fast Jog %02d %05ld ***\n", me->value, now - ctrl->last_jog_time);
 			ctrl->jogrel = me->value;
 			me->type = MEDIA_CTRL_EVENT_NONE;
 		} else {
